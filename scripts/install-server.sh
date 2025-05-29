@@ -34,7 +34,12 @@ sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
 sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
 sudo mysql -e "FLUSH PRIVILEGES;"
 
-# clone the project repository
+# Remove existing project directory if it exists
+if [ -d "$PROJECT_DIR" ]; then
+  sudo rm -rf "$PROJECT_DIR"
+fi
+
+# Clone the project repository
 PROJECT_DIR="/root/ticketing"
 sudo git clone git@github.com:mohammadkharaji/ticketing.git $PROJECT_DIR
 
