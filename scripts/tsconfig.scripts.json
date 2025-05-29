@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./",
+    "noEmit": false,
+    "esModuleInterop": true
+  },
+  "include": ["setup-db.ts"]
+}

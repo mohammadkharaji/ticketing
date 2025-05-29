@@ -1,0 +1,17 @@
+[
+  {
+    "id": "tugv0486c",
+    "created_at": "2025-05-18T13:21:26.301Z",
+    "updated_at": "2025-05-18T13:21:26.302Z",
+    "email": "admin@example.com",
+    "first_name": "Admin",
+    "last_name": "User",
+    "avatar_url": null,
+    "role_id": "admin",
+    "department_id": null,
+    "is_active": true,
+    "phone_number": null,
+    "job_title": null,
+    "password": "SecurePassword123!"
+  }
+]

@@ -1,0 +1,15 @@
+/* اصلاح شفافیت منوهای کشویی */
+.radix-dropdown-menu, 
+.radix-select-menu {
+  background-color: rgba(0, 0, 0, 1) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+/* زمینه تیره برای منوها */
+.dark .radix-dropdown-content, 
+.dark [data-radix-popper-content-wrapper] > div {
+  background-color: hsl(222.2 84% 4.9%) !important;
+  opacity: 1 !important;
+}

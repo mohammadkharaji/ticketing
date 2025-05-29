@@ -1,0 +1,170 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* stylelint-enable */
+
+/* اصلاح شفافیت منوهای کشویی */
+/* منوهای کشویی باید کاملاً مات باشند بدون هیچ شفافیتی */
+[data-radix-popper-content-wrapper] > div,
+[data-radix-popper-content-wrapper] div[role="menu"],
+[data-radix-popper-content-wrapper] [role="listbox"],
+[data-radix-select-content],
+[data-state="open"] > div,
+div[data-radix-menu-content] {
+  background-color: hsl(var(--background)) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* زمینه تیره برای منوها در حالت تیره */
+.dark [data-radix-popper-content-wrapper] > div,
+.dark [data-radix-popper-content-wrapper] div[role="menu"],
+.dark [data-radix-popper-content-wrapper] [role="listbox"],
+.dark [data-radix-select-content],
+.dark [data-state="open"] > div,
+.dark div[data-radix-menu-content] {
+  background-color: hsl(222.2 84% 4.9%) !important;
+}
+
+@import 'dropdown-fix.css';
+
+/* تعریف فونت‌ها در ابتدا */
+@font-face {
+  font-family: 'BKoodkBd'; /* فونت برای متون بولد */
+  src: url('/fonts/BKoodkBd.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BNazanin'; /* فونت برای متون عادی */
+  src: url('/fonts/BNazanin.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'BNazanin', 'BKoodkBd', serif !important; /* فونت پیش‌فرض برای کل بدنه */
+  }
+
+  /* اعمال فونت بولد به تگ‌های معنایی و کلاس‌های رایج */
+  h1, h2, h3, h4, h5, h6, strong, b,
+  .font-bold, .font-semibold, .font-medium {
+    font-family: 'BKoodkBd', 'BNazanin', serif !important; /* اولویت با BKoodkBd برای متون بولد */
+    /* font-weight: bold; /* این به طور خودکار توسط مرورگر اعمال می‌شود */
+  }
+
+  /* در صورت نیاز به تاکید بیشتر بر وزن فونت برای کلاس‌های Tailwind */  .font-bold { font-weight: bold; }
+  /* .font-semibold { font-weight: 600; } */ /* اگر BKoodkBd وزن سمی‌بولد ندارد، این ممکن است به BNazanin بولد یا faux bold منجر شود */
+  /* .font-medium { font-weight: 500; } */ /* مشابه بالا */
+
+  /* Remove all text shadows globally for better visibility */
+  * {
+    text-shadow: none !important;
+  }
+
+}
+
+/* تنظیمات RTL خارج از @layer base */
+.no-text-shadow,
+.no-text-shadow * {
+  text-shadow: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Add RTL support */
+html {
+  direction: rtl;
+}
+body {
+  text-align: right;
+}
+
+/* رفع مشکل محو شدن متن input روی زمینه تیره */
+input, textarea {
+  color: #111 !important; /* مشکی */
+}
+
+/* جلوگیری از نمایش هرگونه نوار یا کادر مشکی در toast */
+html body [data-radix-toast-root][data-state="open"].success .bg-black,
+html body [data-radix-toast-root][data-state="open"].success .bg-neutral-900,
+html body [data-radix-toast-root][data-state="open"].success .bg-gray-900,
+html body [data-radix-toast-root][data-state="open"].success .bg-zinc-900,
+html body .toast.success .bg-black,
+html body .toast.success .bg-neutral-900,
+html body .toast.success .bg-gray-900,
+html body .toast.success .bg-zinc-900,
+html body [data-radix-toast-root][data-state="open"].destructive .bg-black,
+html body [data-radix-toast-root][data-state="open"].destructive .bg-neutral-900,
+html body [data-radix-toast-root][data-state="open"].destructive .bg-gray-900,
+html body [data-radix-toast-root][data-state="open"].destructive .bg-zinc-900,
+html body .toast.destructive .bg-black,
+html body .toast.destructive .bg-neutral-900,
+html body .toast.destructive .bg-gray-900,
+html body .toast.destructive .bg-zinc-900 {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
