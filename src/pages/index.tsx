@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { useAuth } from "../contexts/AuthContext";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { StaticRouter, Route, Routes } from "react-router-dom";
 import ReportsPage from "./reports";
 import HistoryPage from "./history";
 
@@ -21,7 +21,7 @@ export default function HomePage() {
   }, [loading, user, router]);
 
   return (
-    <Router>
+    <StaticRouter location={"/"}>
       <>
         <Head>
           <title>سیستم مدیریت تیکت‌های سازمانی</title>
@@ -42,6 +42,6 @@ export default function HomePage() {
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
       </>
-    </Router>
+    </StaticRouter>
   );
 }
