@@ -4,7 +4,11 @@
 sudo apt update && sudo apt upgrade -y
 
 # Install necessary packages
-sudo apt install -y curl git nodejs npm mysql-server
+sudo apt install -y curl git mysql-server
+
+# Update Node.js to version 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
 
 # Set up MySQL
 sudo systemctl start mysql
@@ -23,9 +27,9 @@ sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
 sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
 sudo mysql -e "FLUSH PRIVILEGES;"
 
-# Clone the project repository
-PROJECT_DIR="/var/www/ticketing"
-sudo git clone https://github.com/your-repo/ticketing.git $PROJECT_DIR
+# clone the project repository
+PROJECT_DIR="/root/ticketing"
+sudo git clone git@github.com:mohammadkharaji/ticketing.git $PROJECT_DIR
 
 # Navigate to the project directory
 cd $PROJECT_DIR
