@@ -22,6 +22,13 @@ DB_NAME="ticketing_db"
 DB_USER="ticketing_user"
 DB_PASSWORD="securepassword"
 
+# Check if database exists and drop it if necessary
+DB_EXISTS=$(sudo mysql -e "SHOW DATABASES LIKE '$DB_NAME';" | grep "$DB_NAME")
+if [ "$DB_EXISTS" ]; then
+  sudo mysql -e "DROP DATABASE $DB_NAME;"
+fi
+
+# Create database and user
 sudo mysql -e "CREATE DATABASE $DB_NAME;"
 sudo mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
 sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
@@ -48,8 +55,8 @@ EOL
 # Build the project
 sudo npm run build
 
-# Start the project
-sudo npm start
+# Start the project automatically in the background
+sudo npm start &
 
 # Print completion message
-echo "Installation complete. The project is running."
+echo "Installation complete. The project is running in the background."
