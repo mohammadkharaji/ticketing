@@ -55,7 +55,7 @@
     "date-fns-jalali": "2.29.3-0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.5.2",
-    "framer-motion": "^12.0.6",
+    "framer-motion": "^12.19.1",
     "input-otp": "^1.4.2",
     "jalaali-js": "1.2.8",
     "lucide-react": "^0.474.0",
