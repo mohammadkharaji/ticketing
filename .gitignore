@@ -74,11 +74,10 @@ ehthumbs.db
 # parcel-bundler cache files
 .cache
 
-# Gatsby files
+# Cache
 .cache/
-public
 
-# Next.js build output
+# Next.js build output (do NOT ignore /public — Next serves static assets from there)
 .next
 
 # Next.js static export output
