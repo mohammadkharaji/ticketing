@@ -1,103 +1,91 @@
-import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import React from "react";
+import Head from "next/head";
+import Link from "next/link";
 import MainLayout from "@/components/layouts/MainLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { toast } from "@/hooks/use-toast";
+import { Settings, User, Shield, Bell, Moon, Sun } from "lucide-react";
+
+const items = [
+  {
+    href: "/settings/profile",
+    title: "پروفایل",
+    desc: "نام، ایمیل و اطلاعات شخصی",
+    icon: User,
+    color: "from-blue-500 to-indigo-600",
+  },
+  {
+    href: "/settings/security",
+    title: "امنیت",
+    desc: "رمز عبور و امنیت حساب",
+    icon: Shield,
+    color: "from-slate-600 to-zinc-800",
+  },
+  {
+    href: "/settings/notifications",
+    title: "اعلان‌ها",
+    desc: "ترجیحات اطلاع‌رسانی",
+    icon: Bell,
+    color: "from-rose-500 to-pink-600",
+  },
+];
 
 export default function SettingsPage() {
-  const { userProfile } = useAuth();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: userProfile?.firstName || "",
-    lastName: userProfile?.lastName || "",
-    phoneNumber: (userProfile as any)?.phoneNumber || (userProfile as any)?.phone_number || "",
-  });
-
-  useEffect(() => {
-    if (userProfile) {
-      setFormData({
-        firstName: userProfile.firstName || "",
-        lastName: userProfile.lastName || "",
-        phoneNumber: (userProfile as any)?.phoneNumber || (userProfile as any)?.phone_number || "",
-      });
-    }
-  }, [userProfile]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userProfile) return;
-
-    setIsUpdating(true);
-    try {
-      // TODO: Implement profile update logic
-      throw new Error("غیرفعال است"); // Temporary error to indicate feature is disabled
-
-      toast({
-        title: "تنظیمات با موفقیت ذخیره شد",
-        variant: "default",
-      });
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast({
-        title: "خطا در ذخیره تنظیمات",
-        description: "لطفاً دوباره تلاش کنید",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  if (!userProfile) return null;
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">تنظیمات</h1>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>اطلاعات شخصی</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">نام</label>
-                <Input
-                  value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">نام خانوادگی</label>
-                <Input
-                  value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">شماره تماس</label>
-                <Input
-                  type="tel"
-                  value={formData.phoneNumber}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isUpdating}>
-              {isUpdating ? "در حال ذخیره..." : "ذخیره تغییرات"}
-            </Button>
+      <Head>
+        <title>تنظیمات | تیکت‌یار</title>
+      </Head>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-500 to-zinc-700 text-white shadow-lg">
+            <Settings className="h-6 w-6" />
           </div>
-        </form>
+          <div>
+            <h1 className="text-2xl font-bold">تنظیمات</h1>
+            <p className="text-sm text-muted-foreground">مدیریت حساب و ظاهر سامانه</p>
+          </div>
+        </div>
+
+        <Card className="rounded-2xl">
+          <CardContent className="flex items-center justify-between p-5">
+            <div className="flex items-center gap-3">
+              {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              <div>
+                <p className="font-medium">حالت تاریک / روشن</p>
+                <p className="text-xs text-muted-foreground">
+                  فعلی: {isDark ? "تاریک" : "روشن"}
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" className="rounded-xl" onClick={toggleTheme}>
+              تغییر تم
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-3">
+          {items.map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Card className="rounded-2xl transition hover:border-primary/30 hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} text-white shadow`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
     </MainLayout>
   );

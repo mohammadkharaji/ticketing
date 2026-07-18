@@ -1,158 +1,149 @@
-import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useEffect, useState } from "react";
+import Head from "next/head";
+import { useRouter } from "next/router";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pagination } from "@/components/ui/pagination";
-import { Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import userService, { UserWithDepartment } from "@/services/userService";
-import { formatPersianDate } from "@/lib/date-utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search, UserPlus, Users } from "lucide-react";
+
+const roleName: Record<string, string> = {
+  admin: "مدیر سیستم",
+  department_manager: "مدیر دپارتمان",
+  branch_manager: "مدیر شعبه",
+  ceo: "مدیرعامل",
+  deputy: "معاون",
+  support: "کارشناس",
+  user: "کاربر",
+};
 
 export default function UsersPage() {
-  const { isAdmin, isDepartmentManager } = useAuth();
+  const { isAdmin } = useAuth();
+  const router = useRouter();
   const [users, setUsers] = useState<UserWithDepartment[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(undefined);
-  const pageSize = 10;
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const filters: any = {
-          page: currentPage,
-          pageSize,
-          searchTerm,
-        };        if (roleFilter && roleFilter !== "all") filters.role = roleFilter;
-        if (departmentFilter && departmentFilter !== "all") filters.department_id = departmentFilter;
-        if (isActiveFilter !== undefined) filters.is_active = isActiveFilter;
-
-        const { users, count } = await userService.getUsers(filters);
-        setUsers(users);
-        setTotalCount(count);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-    };
-
-    fetchUsers();
-  }, [currentPage, searchTerm, roleFilter, departmentFilter, isActiveFilter]);
-
-  const getRoleName = (roleId: string) => {
-    switch (roleId) {
-      case "admin":
-        return "مدیر سیستم";
-      case "department_manager":
-        return "مدیر دپارتمان";
-      case "branch_manager":
-        return "مدیر شعبه";
-      case "ceo":
-        return "مدیرعامل";
-      case "deputy":
-        return "معاون";
-      case "support":
-        return "پشتیبان";
-      case "user":
-        return "کاربر";
-      default:
-        return roleId;
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { users: list } = await userService.getUsers({
+        page: 1,
+        pageSize: 100,
+        searchTerm: searchTerm || undefined,
+        role: roleFilter !== "all" ? roleFilter : undefined,
+      });
+      setUsers(list);
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter]);
+
   return (
     <MainLayout>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">کاربران</h1>
+      <Head>
+        <title>کاربران | تیکت‌یار</title>
+      </Head>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-pink-600 text-white shadow-lg">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">کاربران</h1>
+              <p className="text-sm text-muted-foreground">{users.length} کاربر</p>
+            </div>
+          </div>
           {isAdmin && (
-            <Button>
-              افزودن کاربر جدید
+            <Button
+              className="gap-2 rounded-xl"
+              onClick={() => router.push("/admin/create-user")}
+            >
+              <UserPlus className="h-4 w-4" />
+              کاربر جدید
             </Button>
           )}
         </div>
 
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="جستجو..."
+              className="rounded-xl pr-10"
+              placeholder="جستجوی نام یا ایمیل..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              icon={<Search className="h-4 w-4" />}
+              onKeyDown={(e) => e.key === "Enter" && load()}
             />
           </div>
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="rounded-xl sm:w-48">
               <SelectValue placeholder="نقش" />
-            </SelectTrigger>            <SelectContent>
-              <SelectItem value="all">همه</SelectItem>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه نقش‌ها</SelectItem>
               <SelectItem value="admin">مدیر سیستم</SelectItem>
+              <SelectItem value="support">کارشناس</SelectItem>
               <SelectItem value="department_manager">مدیر دپارتمان</SelectItem>
               <SelectItem value="branch_manager">مدیر شعبه</SelectItem>
-              <SelectItem value="ceo">مدیرعامل</SelectItem>
-              <SelectItem value="deputy">معاون</SelectItem>
-              <SelectItem value="support">پشتیبان</SelectItem>
               <SelectItem value="user">کاربر</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="دپارتمان" />
-            </SelectTrigger>            <SelectContent>
-              <SelectItem value="all">همه</SelectItem>
-              {/* TODO: Add department list */}
-            </SelectContent>
-          </Select>          <Select 
-            value={isActiveFilter === undefined ? "all" : isActiveFilter.toString()} 
-            onValueChange={(value) => setIsActiveFilter(value === "all" ? undefined : value === "true")}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="وضعیت" />
-            </SelectTrigger><SelectContent>
-              <SelectItem value="all">همه</SelectItem>
-              <SelectItem value="true">فعال</SelectItem>
-              <SelectItem value="false">غیرفعال</SelectItem>
-            </SelectContent>
-          </Select>
+          <Button variant="secondary" className="rounded-xl" onClick={load}>
+            اعمال
+          </Button>
         </div>
 
-        <div className="grid gap-4">
-          {users.map((user) => (
-            <Card key={user.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex justify-between">
-                  <span>{user.first_name} {user.last_name}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {getRoleName(user.role_id || "")}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>ایمیل: {user.email}</span>
-                    <span>دپارتمان: {user.department?.name || "تعیین نشده"}</span>
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {users.map((u) => (
+              <Card key={u.id} className="rounded-2xl">
+                <CardContent className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="font-semibold">
+                      {u.first_name} {u.last_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{u.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {u.job_title || "—"} · {u.department_id || "بدون دپارتمان"}
+                    </p>
                   </div>
-                  <div className="flex justify-between mt-1">
-                    <span>وضعیت: {user.is_active ? "فعال" : "غیرفعال"}</span>
-                    <span>تاریخ ثبت‌نام: {formatPersianDate(user.created_at || "")}</span>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge variant="secondary" className="rounded-full">
+                      {roleName[u.role_id || ""] || u.role_id}
+                    </Badge>
+                    <Badge
+                      variant={u.is_active ? "default" : "outline"}
+                      className="rounded-full"
+                    >
+                      {u.is_active ? "فعال" : "غیرفعال"}
+                    </Badge>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {totalCount > pageSize && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(totalCount / pageSize)}
-            onPageChange={setCurrentPage}
-          />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </MainLayout>

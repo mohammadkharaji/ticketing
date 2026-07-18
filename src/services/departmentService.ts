@@ -1,38 +1,63 @@
-// سرویس مدیریت دپارتمان‌ها
-import { Department } from '../models/types';
+import { Department } from "../models/types";
 
 const departmentService = {
   async getDepartments(): Promise<Department[]> {
-    // TODO: دریافت لیست دپارتمان‌ها
-    return [];
+    try {
+      const res = await fetch("/api/departments", { credentials: "include" });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
   },
+
   async getDepartmentById(id: string): Promise<Department | null> {
-    // TODO: دریافت دپارتمان بر اساس شناسه
-    return null;
+    const all = await this.getDepartments();
+    return all.find((d) => d.id === id) || null;
   },
+
   async updateDepartment(id: string, updates: Partial<Department>): Promise<boolean> {
-    // TODO: ویرایش اطلاعات دپارتمان
-    return true;
+    try {
+      const res = await fetch(`/api/departments/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
+
   async deleteDepartment(id: string): Promise<boolean> {
-    // TODO: حذف دپارتمان
-    return true;
+    try {
+      const res = await fetch(`/api/departments/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
-  async createDepartment(departmentData: Omit<Department, 'id' | 'createdAt' | 'updatedAt'>): Promise<Department | null> {
-    // TODO: ایجاد دپارتمان جدید
-    // در اینجا باید یک شناسه منحصر به فرد ایجاد شود و تاریخ‌های createdAt و updatedAt تنظیم شوند.
-    // به عنوان مثال:
-    // const newDepartment: Department = {
-    //   id: generateUniqueId(), // تابعی برای تولید شناسه
-    //   ...departmentData,
-    //   createdAt: new Date().toISOString(),
-    //   updatedAt: new Date().toISOString(),
-    // };
-    // departments.push(newDepartment); // یا ذخیره در دیتابیس
-    // return newDepartment;
-    console.warn('createDepartment needs to be fully implemented');
-    return { id: 'temp-id', ...departmentData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; // بازگشت موقت
-  }
+
+  async createDepartment(
+    departmentData: Omit<Department, "id" | "createdAt" | "updatedAt">
+  ): Promise<Department | null> {
+    try {
+      const res = await fetch("/api/departments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(departmentData),
+        credentials: "include",
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
 };
 
 export default departmentService;

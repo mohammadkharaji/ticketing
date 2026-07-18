@@ -2,7 +2,7 @@ export interface Ticket {
   id: string;
   title: string;
   description: string;
-  ticketNumber: number;
+  ticketNumber: number | string;
   statusId: string;
   priorityId: string;
   categoryId: string;
@@ -15,52 +15,14 @@ export interface Ticket {
   closedAt?: string | null;
 }
 
-export interface TicketWithRelations extends Omit<Ticket, keyof Ticket> {
-  id: string;
-  title: string;
-  description: string;
-  ticketNumber: number;
-  statusId: string;
-  priorityId: string;
-  categoryId: string;
-  departmentId: string;
-  branchId?: string | null;
-  creatorId: string;
-  assigneeId?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  closedAt?: string | null;
-  status?: {
-    id: string;
-    name: string;
-    isClosed: boolean;
-  } | null;
-  priority?: {
-    id: string;
-    name: string;
-  } | null;
-  category?: {
-    id: string;
-    name: string;
-  } | null;
-  department?: {
-    id: string;
-    name: string;
-  } | null;
-  branch?: {
-    id: string;
-    name: string;
-  } | null;
-  creator?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  } | null;
-  assignee?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  } | null;
+export interface TicketWithRelations extends Ticket {
+  status?: { id: string; name: string; isClosed: boolean } | null;
+  priority?: { id: string; name: string } | null;
+  category?: { id: string; name: string } | null;
+  department?: { id: string; name: string } | null;
+  branch?: { id: string; name: string } | null;
+  creator?: { id: string; firstName: string; lastName: string } | null;
+  assignee?: { id: string; firstName: string; lastName: string } | null;
   replies?: TicketReply[];
 }
 
@@ -70,140 +32,98 @@ export interface TicketReply {
   userId: string;
   message: string;
   createdAt: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  } | null;
+  user?: { id: string; firstName: string; lastName: string } | null;
 }
 
 export interface CreateTicketData {
   title: string;
   description: string;
-  statusId: string;
-  priorityId: string;
-  categoryId: string;
-  departmentId: string;
+  statusId?: string;
+  priorityId?: string;
+  categoryId?: string;
+  departmentId?: string;
   branchId?: string | null;
-  creatorId: string;
+  creatorId?: string;
   assigneeId?: string | null;
 }
 
-const mapTicketResponse = (data: any): TicketWithRelations => {
-  return {
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    ticketNumber: data.ticket_number,
-    statusId: data.status_id,
-    priorityId: data.priority_id,
-    categoryId: data.category_id,
-    departmentId: data.department_id,
-    branchId: data.branch_id,
-    creatorId: data.creator_id,
-    assigneeId: data.assignee_id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    closedAt: data.closed_at,
-    status: data.status?.[0] ? {
-      id: data.status[0].id,
-      name: data.status[0].name,
-      isClosed: data.status[0].is_closed,
-    } : null,
-    priority: data.priority?.[0] ? {
-      id: data.priority[0].id,
-      name: data.priority[0].name,
-    } : null,
-    category: data.category?.[0] ? {
-      id: data.category[0].id,
-      name: data.category[0].name,
-    } : null,
-    department: data.department?.[0] ? {
-      id: data.department[0].id,
-      name: data.department[0].name,
-    } : null,
-    branch: data.branch?.[0] ? {
-      id: data.branch[0].id,
-      name: data.branch[0].name,
-    } : null,
-    creator: data.creator?.[0] ? {
-      id: data.creator[0].id,
-      firstName: data.creator[0].first_name,
-      lastName: data.creator[0].last_name,
-    } : null,
-    assignee: data.assignee?.[0] ? {
-      id: data.assignee[0].id,
-      firstName: data.assignee[0].first_name,
-      lastName: data.assignee[0].last_name,
-    } : null,
-    replies: data.replies?.map(mapReplyResponse),
-  };
+export type TicketFilters = {
+  statusId?: string;
+  priorityId?: string;
+  categoryId?: string;
+  departmentId?: string;
+  branchId?: string;
+  creatorId?: string;
+  assigneeId?: string;
+  userId?: string;
+  searchTerm?: string;
+  page?: number;
+  pageSize?: number;
+  ticketNumber?: string;
 };
 
-const mapReplyResponse = (data: any): TicketReply => {
-  return {
-    id: data.id,
-    ticketId: data.ticket_id,
-    userId: data.user_id,
-    message: data.message,
-    createdAt: data.created_at,
-    user: data.user?.[0] ? {
-      id: data.user[0].id,
-      firstName: data.user[0].first_name,
-      lastName: data.user[0].last_name,
-    } : null,
-  };
-};
+async function parseJson(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 const ticketService = {
   async createTicket(ticketData: CreateTicketData): Promise<TicketWithRelations | null> {
     try {
-      // اگر روی سرور هستیم باید آدرس کامل باشد
-      const isServer = typeof window === "undefined";
-      const baseUrl = isServer
-        ? process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"
-        : "";
-      const url = isServer ? `${baseUrl}/api/tickets` : "/api/tickets";
-      const response = await fetch(url, {
+      const response = await fetch("/api/tickets", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(ticketData),
-        credentials: "include", // ارسال کوکی سشن
+        credentials: "include",
       });
-      if (!response.ok) throw new Error("خطا در ایجاد تیکت");
-      const data = await response.json();
-      return data as TicketWithRelations;
+      if (!response.ok) {
+        const err = await parseJson(response);
+        throw new Error(err?.message || "خطا در ایجاد تیکت");
+      }
+      return (await response.json()) as TicketWithRelations;
     } catch (error) {
       console.error("Error in createTicket:", error);
-      return null;
+      throw error;
     }
   },
 
-  async getTickets(filters: {
-    statusId?: string;
-    priorityId?: string;
-    categoryId?: string;
-    departmentId?: string;
-    branchId?: string;
-    creatorId?: string;
-    assigneeId?: string;
-    userId?: string;
-    searchTerm?: string;
-    page?: number;
-    pageSize?: number;
-    ticketNumber?: string; // اضافه شد
-  } = {}): Promise<{ tickets: TicketWithRelations[]; count: number }> {
-    // TODO: Implement backend logic to fetch tickets
-    return {
-      tickets: [],
-      count: 0,
-    };
+  async getTickets(
+    filters: TicketFilters = {}
+  ): Promise<{ tickets: TicketWithRelations[]; count: number }> {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      const qs = params.toString();
+      const response = await fetch(`/api/tickets${qs ? `?${qs}` : ""}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        if (response.status === 401) return { tickets: [], count: 0 };
+        throw new Error("خطا در دریافت تیکت‌ها");
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        return { tickets: data, count: data.length };
+      }
+      return {
+        tickets: data.tickets || [],
+        count: data.count ?? data.totalTickets ?? (data.tickets?.length || 0),
+      };
+    } catch (error) {
+      console.error("Error in getTickets:", error);
+      return { tickets: [], count: 0 };
+    }
   },
 
   async getTicketById(ticketId: string): Promise<TicketWithRelations | null> {
-    const res = await fetch(`/api/tickets/${ticketId}`);
+    const res = await fetch(`/api/tickets/${ticketId}`, { credentials: "include" });
     if (!res.ok) return null;
     return await res.json();
   },
@@ -216,6 +136,7 @@ const ticketService = {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
+      credentials: "include",
     });
     if (!res.ok) throw new Error("خطا در بروزرسانی تیکت");
     return await res.json();
@@ -230,24 +151,40 @@ const ticketService = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: data.userId, message: data.message }),
+      credentials: "include",
     });
     if (!res.ok) throw new Error("خطا در ارسال پاسخ");
     return await res.json();
   },
 
   async closeTicket(ticketId: string): Promise<void> {
-    const res = await fetch(`/api/tickets/${ticketId}/close`, { method: "POST" });
+    const res = await fetch(`/api/tickets/${ticketId}/close`, {
+      method: "POST",
+      credentials: "include",
+    });
     if (!res.ok) throw new Error("خطا در بستن تیکت");
   },
 
   async reopenTicket(ticketId: string): Promise<void> {
-    const res = await fetch(`/api/tickets/${ticketId}/reopen`, { method: "POST" });
-    if (!res.ok) throw new Error("خطا در بازکردن مجدد تیکت");
+    const res = await fetch(`/api/tickets/${ticketId}/reopen`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("خطا در بازگشایی تیکت");
   },
 
   async deleteTicket(ticketId: string): Promise<boolean> {
-    const res = await fetch(`/api/tickets/${ticketId}`, { method: "DELETE" });
+    const res = await fetch(`/api/tickets/${ticketId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
     return res.ok;
+  },
+
+  async getDashboardStats() {
+    const res = await fetch("/api/dashboard", { credentials: "include" });
+    if (!res.ok) throw new Error("خطا در دریافت آمار داشبورد");
+    return res.json();
   },
 };
 

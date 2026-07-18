@@ -1,64 +1,54 @@
 import React, { useEffect, useState } from "react";
 import Head from "next/head";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
+import MainLayout from "@/components/layouts/MainLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Clock } from "lucide-react";
 
 export default function PendingRegistrationsPage() {
-  const [pending, setPending] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("/api/admin/pending-registrations")
-      .then(res => res.json())
-      .then(data => {
-        setPending(data.pending || []);
-        setLoading(false);
-      });
+    fetch("/api/admin/pending-registrations", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setItems(Array.isArray(data) ? data : data.items || []))
+      .catch(() => setItems([]));
   }, []);
 
   return (
-    <>
+    <MainLayout>
       <Head>
-        <title>ثبت‌نام‌های جدید</title>
+        <title>ثبت‌نام‌های معلق | تیکت‌یار</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 rtl">
-        <div className="w-full max-w-md">
-          <Card>
-            <CardHeader>
-              <CardTitle>ثبت‌نام‌های جدید</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div>در حال بارگذاری...</div>
-              ) : pending.length === 0 ? (
-                <div className="text-center text-muted-foreground">در حال حاضر ثبت‌نام جدیدی وجود ندارد.</div>
-              ) : (
-                <ul className="space-y-2">
-                  {pending.map(email => (
-                    <li key={email} className="flex items-center justify-between border-b py-2">
-                      <span>{email}</span>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={async () => {
-                          await fetch("/api/admin/remove-pending-registration", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ email }),
-                          });
-                          setPending(pending.filter(e => e !== email));
-                        }}
-                      >
-                        حذف
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg">
+            <Clock className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">ثبت‌نام‌های در انتظار تأیید</h1>
+            <p className="text-sm text-muted-foreground">{items.length} مورد</p>
+          </div>
+        </div>
+        {items.length === 0 ? (
+          <Card className="rounded-2xl">
+            <CardContent className="py-16 text-center text-muted-foreground">
+              درخواست معلقی وجود ندارد
             </CardContent>
           </Card>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((item: any, i: number) => (
+              <Card key={item.id || i} className="rounded-2xl">
+                <CardContent className="p-4 text-sm">
+                  <pre className="whitespace-pre-wrap">
+                    {JSON.stringify(item, null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </>
+    </MainLayout>
   );
 }

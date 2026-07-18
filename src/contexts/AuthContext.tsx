@@ -1,17 +1,29 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import authService, { UserProfile, SignInCredentials } from "../services/authService";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
+import authService, {
+  AuthUser,
+  UserProfile,
+  SignInCredentials,
+} from "../services/authService";
 
 interface AuthState {
-  user: any | null; // User type from LDAP (currently any)
+  user: AuthUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  error: Error | null; // To store any auth errors
+  error: Error | null;
 }
 
 interface AuthContextType extends AuthState {
   signIn: (credentials: SignInCredentials) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshAuth: () => Promise<void>; // Added method to refresh auth state
+  refreshAuth: () => Promise<void>;
   isAdmin: boolean;
   isDepartmentManager: boolean;
   isBranchManager: boolean;
@@ -19,20 +31,67 @@ interface AuthContextType extends AuthState {
   isDeputy: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({
+/** useAuth also exposes userProfile as an alias of profile */
+export type UseAuthReturn = AuthContextType & {
+  userProfile: UserProfile | null;
+};
+
+function toError(e: unknown, fallback: string): Error {
+  if (e instanceof Error) return e;
+  if (e && typeof e === "object" && "message" in e) {
+    return new Error(String((e as { message: unknown }).message) || fallback);
+  }
+  return new Error(fallback);
+}
+
+function profileFromUser(user: AuthUser): UserProfile {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    roleId: user.roleId,
+    departmentId: user.departmentId,
+    departmentSectionId: user.departmentSectionId,
+    branchId: user.branchId,
+    branchSectionId: user.branchSectionId,
+    isActive: user.isActive,
+  };
+}
+
+async function resolveProfile(user: AuthUser): Promise<UserProfile> {
+  const base = profileFromUser(user);
+  try {
+    const fetched = await authService.getUserProfile(user.id);
+    if (fetched?.id) return fetched;
+  } catch (err) {
+    console.warn("Profile fetch failed, using session user:", err);
+  }
+  return base;
+}
+
+const defaultAuth: AuthContextType = {
   user: null,
   profile: null,
   loading: true,
   error: null,
-  signIn: async () => { throw new Error('signIn function not implemented'); },
-  signOut: async () => { throw new Error('signOut function not implemented'); },
-  refreshAuth: async () => { throw new Error('refreshAuth function not implemented'); },
+  signIn: async () => {
+    throw new Error("signIn is not available (AuthProvider missing)");
+  },
+  signOut: async () => {
+    throw new Error("signOut is not available (AuthProvider missing)");
+  },
+  refreshAuth: async () => {
+    throw new Error("refreshAuth is not available (AuthProvider missing)");
+  },
   isAdmin: false,
   isDepartmentManager: false,
   isBranchManager: false,
   isCEO: false,
   isDeputy: false,
-});
+};
+
+const AuthContext = createContext<AuthContextType>(defaultAuth);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
@@ -42,153 +101,138 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error: null,
   });
 
-  const isAdmin = authState.profile?.roleId === "admin";
-  const isDepartmentManager = authState.profile?.roleId === "department_manager";
-  const isBranchManager = authState.profile?.roleId === "branch_manager";
-  const isCEO = authState.profile?.roleId === "ceo";
-  const isDeputy = authState.profile?.roleId === "deputy";
+  const roleId = authState.profile?.roleId ?? authState.user?.roleId ?? null;
+  const isAdmin = roleId === "admin";
+  const isDepartmentManager = roleId === "department_manager";
+  const isBranchManager = roleId === "branch_manager";
+  const isCEO = roleId === "ceo";
+  const isDeputy = roleId === "deputy";
 
-  // Function to refresh authentication state
-  const refreshAuth = async () => {
+  const refreshAuth = useCallback(async () => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      setAuthState(prev => ({ ...prev, loading: true }));
-      console.log("Refreshing auth state...");
-      
       const currentUser = await authService.getCurrentUser();
-      console.log("Current user from API:", currentUser);
-      
-      if (currentUser && currentUser.id) {
-        console.log(`Fetching profile for user ID: ${currentUser.id}`);
-        const userProfile = await authService.getUserProfile(currentUser.id);
-        console.log("User profile from API:", userProfile);
-        
+
+      if (currentUser?.id) {
+        const userProfile = await resolveProfile(currentUser);
         setAuthState({
           user: currentUser,
           profile: userProfile,
           loading: false,
           error: null,
         });
-      } else {
-        console.log("No current user found or user ID not available");
-        // For development/testing: Create a mock user to simulate authentication
-        const mockUser = {
-          id: "mock-user-id",
-          firstName: "Mock",
-          lastName: "User",
-          email: "mock@example.com",
-          roleId: "admin",
-          isActive: true
-        };
-        
-        console.log("Creating mock user for development:", mockUser);
-        
-        setAuthState({
-          user: mockUser,
-          profile: mockUser,
-          loading: false,
-          error: null,
-        });
+        return;
       }
-    } catch (e: any) {
-      console.error("Auth refresh error:", e);
-      setAuthState(prev => ({ ...prev, loading: false, error: e }));
-    }
-  };
-  // Initial auth check on mount
-  useEffect(() => {
-    console.log("AuthContext: Initial auth check on mount");
-    
-    const initAuth = async () => {
-      try {
-        await refreshAuth();
-      } catch (error) {
-        console.error("Initial auth check failed:", error);
-        
-        // If initial auth check fails, try creating a mock user
-        const mockUser = {
-          id: "mock-user-id",
-          firstName: "Mock",
-          lastName: "User",
-          email: "mock@example.com",
-          roleId: "admin",
-          isActive: true
-        };
-        
-        console.log("Setting fallback mock user for development:", mockUser);
-        
-        setAuthState({
-          user: mockUser,
-          profile: mockUser,
-          loading: false,
-          error: null,
-        });
-      }
-    };
-    
-    initAuth();
-  }, []);
 
-  const signIn = async (credentials: SignInCredentials) => {
-    try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { user: ldapUser, error } = await authService.signIn(credentials);
-      if (error) throw error;
-      if (ldapUser && ldapUser.id) {
-        const userProfile = await authService.getUserProfile(ldapUser.id);
-        setAuthState({
-          user: ldapUser,
-          profile: userProfile,
-          loading: false,
-          error: null,
-        });
-      } else {
-        throw new Error(ldapUser ? "User ID not available after sign in." : "Sign in failed to return a user.");
-      }
-    } catch (e: any) {
-      console.error("Auth signIn error:", e);
-      setAuthState(prev => ({ ...prev, user: null, profile: null, loading: false, error: e }));
-      throw e;
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      const { error } = await authService.signOut();
-      if (error) throw error;
       setAuthState({
         user: null,
         profile: null,
         loading: false,
         error: null,
       });
-    } catch (e: any) {
-      console.error("Auth signOut error:", e);
-      setAuthState(prev => ({ ...prev, loading: false, error: e }));
-      throw e;
+    } catch (e: unknown) {
+      console.error("Auth refresh error:", e);
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: toError(e, "Auth refresh failed"),
+      });
     }
-  };
+  }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        ...authState,
-        signIn,
-        signOut,
-        refreshAuth,
-        isAdmin,
-        isDepartmentManager,
-        isBranchManager,
-        isCEO,
-        isDeputy,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  useEffect(() => {
+    void refreshAuth();
+  }, [refreshAuth]);
+
+  const signIn = useCallback(async (credentials: SignInCredentials) => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const { user: signedInUser, error } = await authService.signIn(credentials);
+      if (error) {
+        throw toError(error, "ورود ناموفق بود");
+      }
+      if (!signedInUser?.id) {
+        throw new Error("ورود کاربر را برنگرداند.");
+      }
+
+      const userProfile = await resolveProfile(signedInUser);
+      setAuthState({
+        user: signedInUser,
+        profile: userProfile,
+        loading: false,
+        error: null,
+      });
+    } catch (e: unknown) {
+      console.error("Auth signIn error:", e);
+      const err = toError(e, "خطا در ورود");
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: err,
+      });
+      throw err;
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const { error } = await authService.signOut();
+      if (error) {
+        console.warn("SignOut API warning:", error);
+      }
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: null,
+      });
+    } catch (e: unknown) {
+      console.error("Auth signOut error:", e);
+      // Always clear local auth so the user is not stuck logged-in
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: toError(e, "خطا در خروج"),
+      });
+    }
+  }, []);
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      ...authState,
+      signIn,
+      signOut,
+      refreshAuth,
+      isAdmin,
+      isDepartmentManager,
+      isBranchManager,
+      isCEO,
+      isDeputy,
+    }),
+    [
+      authState,
+      signIn,
+      signOut,
+      refreshAuth,
+      isAdmin,
+      isDepartmentManager,
+      isBranchManager,
+      isCEO,
+      isDeputy,
+    ]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
-  const { profile, ...rest } = useContext(AuthContext);
-  return { userProfile: profile, ...rest };
+export const useAuth = (): UseAuthReturn => {
+  const ctx = useContext(AuthContext);
+  return {
+    ...ctx,
+    userProfile: ctx.profile,
+  };
 };

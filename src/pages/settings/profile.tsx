@@ -1,42 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import Head from "next/head";
+import MainLayout from "@/components/layouts/MainLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function ProfileSettingsPage() {
-  const { userProfile } = useAuth();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    if (userProfile) {
-      setFirstName(userProfile.firstName || "");
-      setLastName(userProfile.lastName || "");
-      setEmail(userProfile.email || "");
-    }
-  }, [userProfile]);
+  const { userProfile, isAdmin } = useAuth();
 
   return (
-    <div className="container py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>پروفایل کاربری</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <label className="block mb-1">نام</label>
-            <input className="input" value={firstName} disabled />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-1">نام خانوادگی</label>
-            <input className="input" value={lastName} disabled />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-1">ایمیل</label>
-            <input className="input" value={email} disabled />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <MainLayout>
+      <Head>
+        <title>پروفایل | تیکت‌یار</title>
+      </Head>
+      <div className="mx-auto max-w-xl space-y-6">
+        <h1 className="text-2xl font-bold">پروفایل کاربری</h1>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>
+              {userProfile?.firstName} {userProfile?.lastName}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between border-b py-2">
+              <span className="text-muted-foreground">ایمیل</span>
+              <span>{userProfile?.email}</span>
+            </div>
+            <div className="flex justify-between border-b py-2">
+              <span className="text-muted-foreground">نقش</span>
+              <Badge className="rounded-full">{userProfile?.roleId}</Badge>
+            </div>
+            <div className="flex justify-between border-b py-2">
+              <span className="text-muted-foreground">دپارتمان</span>
+              <span>{userProfile?.departmentId || "—"}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-muted-foreground">وضعیت</span>
+              <Badge variant={userProfile?.isActive ? "default" : "outline"}>
+                {userProfile?.isActive ? "فعال" : "غیرفعال"}
+              </Badge>
+            </div>
+            {isAdmin && (
+              <p className="pt-2 text-xs text-muted-foreground">
+                شما دسترسی مدیر سیستم دارید.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
   );
 }

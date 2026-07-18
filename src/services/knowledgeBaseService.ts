@@ -1,26 +1,45 @@
-// سرویس مدیریت دانش (مقالات)
-
 const knowledgeBaseService = {
-  async getArticles() {
-    // TODO: دریافت لیست مقالات
-    return [];
+  async getArticles(search?: string) {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+    const res = await fetch(`/api/knowledge-base${qs}`, { credentials: "include" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.articles || data || [];
   },
-  async getArticleById(id: string) {
-    // TODO: دریافت مقاله بر اساس شناسه
-    return null;
+
+  async getArticle(id: string) {
+    const res = await fetch(`/api/knowledge-base?id=${encodeURIComponent(id)}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    return res.json();
   },
-  async createArticle(data: any) {
-    // TODO: ایجاد مقاله جدید
-    return { id: 'new', ...data };
+
+  async getCategories() {
+    const res = await fetch(`/api/knowledge-base?categories=1`, {
+      credentials: "include",
+    });
+    if (!res.ok) return [];
+    return res.json();
   },
-  async updateArticle(id: string, updates: any) {
-    // TODO: ویرایش مقاله
-    return true;
+
+  async createArticle(payload: {
+    title: string;
+    summary?: string;
+    content: string;
+    categoryId?: string;
+    categoryName?: string;
+    tags?: string[];
+  }) {
+    const res = await fetch("/api/knowledge-base", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("خطا در ایجاد مقاله");
+    return res.json();
   },
-  async deleteArticle(id: string) {
-    // TODO: حذف مقاله
-    return true;
-  }
 };
 
 export default knowledgeBaseService;

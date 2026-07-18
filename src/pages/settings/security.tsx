@@ -1,31 +1,83 @@
 import React, { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import Head from "next/head";
+import MainLayout from "@/components/layouts/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 export default function SecuritySettingsPage() {
-  // فرض بر این است که احراز هویت دو مرحله‌ای و سایر تنظیمات امنیتی از اکتیودایرکتوری مدیریت می‌شود
-  const [twoFactorEnabled] = useState(true); // فقط نمایشی
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 8) {
+      toast({ title: "رمز باید حداقل ۸ کاراکتر باشد", variant: "destructive" });
+      return;
+    }
+    if (password !== confirm) {
+      toast({ title: "تکرار رمز مطابقت ندارد", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newPassword: password }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "درخواست به‌روزرسانی رمز ارسال شد" });
+      setPassword("");
+      setConfirm("");
+    } catch {
+      toast({
+        title: "این قابلیت در حالت توسعه محدود است",
+        description: "API به‌روزرسانی رمز را بعداً کامل کنید",
+      });
+    }
+  };
 
   return (
-    <div className="container py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>تنظیمات امنیتی</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-6">
-            <h2 className="text-lg font-bold mb-2">احراز هویت دو مرحله‌ای</h2>
-            <p className="mb-2">امنیت حساب شما با احراز هویت دو مرحله‌ای افزایش یافته است.</p>
-            <div>
-              <span className="inline-block px-3 py-1 rounded bg-green-100 text-green-700 text-xs font-bold">فعال</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">فعال‌سازی و مدیریت این قابلیت فقط از طریق اکتیودایرکتوری سازمان انجام می‌شود.</p>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold mb-2">تغییر رمز عبور</h2>
-            <p className="mb-2">تغییر رمز عبور فقط از طریق واحد IT یا اکتیودایرکتوری سازمان امکان‌پذیر است.</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <MainLayout>
+      <Head>
+        <title>امنیت | تیکت‌یار</title>
+      </Head>
+      <div className="mx-auto max-w-xl space-y-6">
+        <h1 className="text-2xl font-bold">امنیت حساب</h1>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>تغییر رمز عبور</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>رمز جدید</Label>
+                <Input
+                  type="password"
+                  className="rounded-xl"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>تکرار رمز</Label>
+                <Input
+                  type="password"
+                  className="rounded-xl"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="rounded-xl">
+                ذخیره
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
   );
 }

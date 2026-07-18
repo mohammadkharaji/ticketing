@@ -30,7 +30,50 @@ export interface AuthSession { // Using an interface for a more specific type
   // Add other session-related data if needed
 }
 
-import userService from './userService';
+const SESSION_TOKEN_KEY = 'sessionToken';
+const SESSION_USER_KEY = 'sessionUser';
+const SESSION_EXPIRES_KEY = 'sessionExpiresAt';
+
+function saveSession(user: AuthUser, session: AuthSession) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SESSION_TOKEN_KEY, session.token);
+  localStorage.setItem(SESSION_EXPIRES_KEY, session.expiresAt);
+  localStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
+}
+
+function clearSession() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(SESSION_TOKEN_KEY);
+  localStorage.removeItem(SESSION_EXPIRES_KEY);
+  localStorage.removeItem(SESSION_USER_KEY);
+}
+
+function loadStoredUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_USER_KEY);
+    const token = localStorage.getItem(SESSION_TOKEN_KEY);
+    if (!raw || !token) return null;
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
+function mapApiUser(user: any): AuthUser {
+  return {
+    id: user.id,
+    firstName: user.first_name ?? user.firstName ?? null,
+    lastName: user.last_name ?? user.lastName ?? null,
+    email: user.email,
+    roleId: user.role_id ?? user.roleId ?? null,
+    departmentId: user.department_id ?? user.departmentId ?? null,
+    departmentSectionId: user.departmentSectionId ?? null,
+    branchId: user.branchId ?? null,
+    branchSectionId: user.branchSectionId ?? null,
+    isActive: user.is_active ?? user.isActive ?? true,
+  };
+}
 
 const authService = {
   async signIn({ email, password }: SignInCredentials): Promise<{ user: AuthUser | null; session: AuthSession | null; error: any }> {
@@ -50,21 +93,16 @@ const authService = {
         }
         throw new Error(errorData.message || `Login failed with status: ${response.status}`);
       }
-      const { user } = await response.json();
-      // session mock
-      const session: AuthSession = { token: 'devtoken', expiresAt: new Date(Date.now() + 86400000).toISOString() };
-      // تبدیل ساختار کاربر به UserProfile
-      const userProfile: UserProfile = {
-        id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
-        roleId: user.role_id,
-        departmentId: user.department_id,
-        isActive: user.is_active,
+      const data = await response.json();
+      const userProfile = mapApiUser(data.user);
+      const session: AuthSession = data.session || {
+        token: `devtoken:${userProfile.id}`,
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
       };
+      saveSession(userProfile, session);
       return { user: userProfile, session, error: null };
     } catch (error: any) {
+      clearSession();
       return { user: null, session: null, error: { message: error.message || 'An unexpected error occurred during sign-in.' } };
     }
   },
@@ -72,11 +110,9 @@ const authService = {
   async signOut(): Promise<{ error: any }> {
     console.log('AuthService: signOut attempt');
     try {
-      // Replace '/api/auth/logout' with your actual backend endpoint
-      const response = await fetch('/api/auth/logout', { 
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
-        // Include credentials or tokens if required by your backend for logout
-        // headers: { 'Authorization': `Bearer ${localStorage.getItem('sessionToken')}` },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -88,28 +124,30 @@ const authService = {
         }
         throw new Error(errorData.message || `Logout failed with status: ${response.status}`);
       }
-      
-      // Clear local session storage/cookies if necessary
-      // localStorage.removeItem('sessionToken'); 
-      // Potentially clear other user-related data from local state/storage
 
+      clearSession();
       return { error: null };
     } catch (error: any) {
       console.error('AuthService: signOut error:', error);
+      clearSession();
       return { error: { message: error.message || "An unexpected error occurred during sign-out." } };
     }
   },
   async getCurrentUser(): Promise<AuthUser | null> {
     console.log('AuthService: getCurrentUser attempt');
+    // Prefer local session so login works even if cookie was blocked
+    const stored = loadStoredUser();
+    if (stored?.id) {
+      return stored;
+    }
+
     try {
-      // Replace '/api/auth/me' with your actual backend endpoint for fetching the current user
-      // This endpoint should typically be protected and use the session token (e.g., from a cookie or Authorization header)
       const response = await fetch('/api/auth/me', {
-        credentials: 'include', // ارسال کوکی سشن برای دریافت وضعیت کاربر
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        if (response.status === 401) { // Unauthorized
+        if (response.status === 401) {
           console.log('AuthService: getCurrentUser - No active session or unauthorized.');
           return null;
         }
@@ -122,13 +160,11 @@ const authService = {
         throw new Error(errorData.message || `Failed to fetch current user with status: ${response.status}`);
       }
 
-      const user: AuthUser = await response.json();
+      const user: AuthUser = mapApiUser(await response.json());
       console.log('AuthService: getCurrentUser received user:', user);
       return user;
     } catch (error: any) {
       console.error('AuthService: getCurrentUser error:', error);
-      // Depending on the error, you might want to clear local session data if it's invalid
-      // localStorage.removeItem('sessionToken');
       return null;
     }
   },
@@ -161,43 +197,28 @@ const authService = {
     return null; // Placeholder if no session found or not implemented for the specific auth strategy
   },
   async getUserProfile(userId: string): Promise<UserProfile | null> {
-    console.log('AuthService: getUserProfile attempt for userId:', userId);
+    // Prefer already-stored session user (fast path after login)
+    const stored = loadStoredUser();
+    if (stored?.id === userId) {
+      return stored;
+    }
+
     try {
-      // Replace `/api/users/${userId}/profile` with your actual backend endpoint
-      // This endpoint might require authentication
       const response = await fetch(`/api/users/${userId}/profile`, {
-        // headers: { 'Authorization': `Bearer ${localStorage.getItem('sessionToken')}` }, // If using token-based auth
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        if (response.status === 404) { // Not Found
-          console.log('AuthService: getUserProfile - User not found or profile does not exist.');
-          return null;
+        if (response.status === 404 || response.status === 401) {
+          return stored?.id === userId ? stored : null;
         }
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          throw new Error(response.statusText || `Failed to fetch user profile with status: ${response.status}`);
-        }
-        throw new Error(errorData.message || `Failed to fetch user profile with status: ${response.status}`);
+        return stored?.id === userId ? stored : null;
       }
 
-      const profile: UserProfile = await response.json();
-      console.log('AuthService: getUserProfile received profile:', profile);
-      return profile;
+      return mapApiUser(await response.json());
     } catch (error: any) {
       console.error('AuthService: getUserProfile error:', error);
-      // If there was an error retrieving the profile, return a mock profile for testing
-      console.log('AuthService: Returning mock profile for testing purposes');
-      return {
-        id: userId,
-        firstName: 'Test',
-        lastName: 'User',
-        email: 'test@example.com',
-        roleId: 'admin',
-        isActive: true,
-      };
+      return stored?.id === userId ? stored : null;
     }
   },
 

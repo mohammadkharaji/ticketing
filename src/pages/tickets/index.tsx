@@ -1,192 +1,217 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pagination } from "@/components/ui/pagination";
-import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import ticketService, { TicketWithRelations } from "@/services/ticketService";
-import { formatPersianDate, formatPersianRelativeTime } from "@/lib/date-utils"; // مسیر صحیح
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Search, RefreshCw, Ticket } from "lucide-react";
+
+const statusLabel: Record<string, string> = {
+  open: "باز",
+  in_progress: "در حال بررسی",
+  waiting: "در انتظار",
+  closed: "بسته",
+  resolved: "حل‌شده",
+};
+
+const priorityLabel: Record<string, string> = {
+  low: "کم",
+  medium: "متوسط",
+  high: "بالا",
+  urgent: "فوری",
+};
 
 export default function TicketsPage() {
-  const { userProfile, isAdmin, isDepartmentManager, isBranchManager } = useAuth();
   const router = useRouter();
+  const { userProfile, isAdmin, isDepartmentManager, isBranchManager } = useAuth();
   const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [ticketNumberSearch, setTicketNumberSearch] = useState(""); // گزینه 3
-  const pageSize = 10;
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(
+    (router.query.search as string) || ""
+  );
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+
+  const load = async () => {
+    if (!userProfile) return;
+    setLoading(true);
+    try {
+      const filters: any = {
+        page: 1,
+        pageSize: 50,
+        searchTerm: searchTerm || undefined,
+      };
+      if (statusFilter !== "all") filters.statusId = statusFilter;
+      if (priorityFilter !== "all") filters.priorityId = priorityFilter;
+      if (!isAdmin && !isDepartmentManager && !isBranchManager) {
+        filters.userId = userProfile.id;
+      } else if (isDepartmentManager && userProfile.departmentId) {
+        filters.departmentId = userProfile.departmentId;
+      }
+
+      const { tickets: list, count } = await ticketService.getTickets(filters);
+      setTickets(list);
+      setTotal(count);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!userProfile) return;
+    if (router.query.search) setSearchTerm(String(router.query.search));
+  }, [router.query.search]);
 
-    const fetchTickets = async () => {
-      try {
-        const filters: any = {
-          page: currentPage,
-          pageSize,
-          searchTerm,
-        };
-
-        if (statusFilter) filters.statusId = statusFilter;
-        if (priorityFilter) filters.priorityId = priorityFilter;
-        // جستجو بر اساس کد تیکت
-        if (ticketNumberSearch) filters.ticketNumber = ticketNumberSearch;
-
-        // فیلتر بر اساس نقش کاربر
-        if (!isAdmin && !isDepartmentManager && !isBranchManager) {
-          // کاربر عادی فقط تیکت‌های خودش را می‌بیند
-          filters.userId = userProfile.id;
-        } else if (isDepartmentManager) {
-          // مدیر دپارتمان تیکت‌های دپارتمان خود را می‌بیند
-          filters.departmentId = userProfile.departmentId;
-        } else if (isBranchManager) {
-          // مدیر شعبه تیکت‌های شعبه خود را می‌بیند
-          filters.branchId = userProfile.branchId;
-        }
-
-        const { tickets, count } = await ticketService.getTickets(filters);
-        setTickets(tickets);
-        setTotalCount(count);
-      } catch (error) {
-        console.error("Error fetching tickets:", error);
-      }
-    };
-
-    fetchTickets();
-  }, [userProfile, currentPage, searchTerm, statusFilter, priorityFilter, ticketNumberSearch, isAdmin, isDepartmentManager, isBranchManager]);
-
-  const getStatusColor = (statusId: string) => {
-    switch (statusId) {
-      case "open":
-        return "text-green-600";
-      case "in_progress":
-        return "text-blue-600";
-      case "waiting":
-        return "text-yellow-600";
-      case "closed":
-        return "text-gray-600";
-      default:
-        return "text-gray-600";
-    }
-  };
-
-  const getPriorityColor = (priorityId: string) => {
-    switch (priorityId) {
-      case "high":
-        return "text-red-600";
-      case "medium":
-        return "text-yellow-600";
-      case "low":
-        return "text-green-600";
-      default:
-        return "text-gray-600";
-    }
-  };
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile, statusFilter, priorityFilter]);
 
   return (
     <MainLayout>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">تیکت‌ها</h1>
-          <Button onClick={() => router.push('/tickets/new')} className="flex items-center">
-            <span className="flex items-center">
-              <Plus className="ml-2 h-4 w-4" />
+      <Head>
+        <title>تیکت‌ها | تیکت‌یار</title>
+      </Head>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">تیکت‌ها</h1>
+            <p className="text-sm text-muted-foreground">
+              {total} تیکت · مدیریت و پیگیری درخواست‌ها
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={load} className="rounded-xl">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button className="rounded-xl gap-2" onClick={() => router.push("/tickets/new")}>
+              <Plus className="h-4 w-4" />
               تیکت جدید
-            </span>
-          </Button>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <Input
-              placeholder="جستجو..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              icon={<Search className="h-4 w-4" />}
-            />
-          </div>
-          {/* گزینه 3: جستجو بر اساس کد تیکت */}
-          <div className="min-w-[180px]">
-            <Input
-              placeholder="کد تیکت (مثال: 2184020101)"
-              value={ticketNumberSearch}
-              onChange={e => setTicketNumberSearch(e.target.value)}
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="وضعیت" />
-            </SelectTrigger>            <SelectContent>
-              <SelectItem value="all">همه</SelectItem>
-              <SelectItem value="open">باز</SelectItem>
-              <SelectItem value="in_progress">در حال بررسی</SelectItem>
-              <SelectItem value="waiting">در انتظار پاسخ</SelectItem>
-              <SelectItem value="closed">بسته شده</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="اولویت" />
-            </SelectTrigger>            <SelectContent>
-              <SelectItem value="all">همه</SelectItem>
-              <SelectItem value="high">بالا</SelectItem>
-              <SelectItem value="medium">متوسط</SelectItem>
-              <SelectItem value="low">پایین</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Card className="rounded-2xl border-border/60 shadow-sm">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="rounded-xl pr-10"
+                placeholder="جستجو در عنوان، توضیحات یا کد..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && load()}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full rounded-xl md:w-40">
+                <SelectValue placeholder="وضعیت" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه وضعیت‌ها</SelectItem>
+                <SelectItem value="open">باز</SelectItem>
+                <SelectItem value="in_progress">در حال بررسی</SelectItem>
+                <SelectItem value="waiting">در انتظار</SelectItem>
+                <SelectItem value="closed">بسته</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full rounded-xl md:w-40">
+                <SelectValue placeholder="اولویت" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">همه اولویت‌ها</SelectItem>
+                <SelectItem value="urgent">فوری</SelectItem>
+                <SelectItem value="high">بالا</SelectItem>
+                <SelectItem value="medium">متوسط</SelectItem>
+                <SelectItem value="low">کم</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" className="rounded-xl" onClick={load}>
+              اعمال
+            </Button>
+          </CardContent>
+        </Card>
 
-        <div className="grid gap-4">
-          {tickets.map((ticket) => (
-            <Link key={ticket.id} href={`/tickets/${ticket.id}`} legacyBehavior passHref>
-              <div>
-                <Card className="hover:bg-accent/5 transition-colors">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex justify-between">
-                      <span>#{ticket.ticketNumber} - {ticket.title}</span>
-                      <div className="flex gap-2 text-sm">
-                        <span className={getStatusColor(ticket.statusId)}>
-                          {ticket.status?.name}
-                        </span>
-                        <span className={getPriorityColor(ticket.priorityId)}>
-                          {ticket.priority?.name}
-                        </span>
-                      </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground">
-                      <div className="flex justify-between">
-                        <span>دپارتمان: {ticket.department?.name}</span>
-                        <span>ایجاد کننده: {ticket.creator?.firstName} {ticket.creator?.lastName}</span>
-                      </div>
-                      <div className="flex justify-between mt-1">
-                        <span>آخرین بروزرسانی: {formatPersianRelativeTime(ticket.updatedAt)}</span>
-                        <span>ایجاد شده در: {formatPersianDate(ticket.createdAt)}</span>
-                      </div>
+        <div className="space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          ) : tickets.length === 0 ? (
+            <Card className="rounded-2xl">
+              <CardContent className="flex flex-col items-center py-16 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <Ticket className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold">تیکتی یافت نشد</h3>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  فیلتر را تغییر دهید یا تیکت جدید بسازید
+                </p>
+                <Button onClick={() => router.push("/tickets/new")} className="rounded-xl">
+                  ایجاد تیکت
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            tickets.map((t) => (
+              <Card
+                key={t.id}
+                className="cursor-pointer rounded-2xl border-border/60 transition hover:border-primary/30 hover:shadow-md"
+                onClick={() => router.push(`/tickets/${t.id}`)}
+              >
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        #{t.ticketNumber}
+                      </span>
+                      <h3 className="truncate font-semibold">{t.title}</h3>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </Link>
-          ))}
+                    <p className="line-clamp-1 text-sm text-muted-foreground">
+                      {t.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
+                      <span>{t.department?.name || t.departmentId}</span>
+                      <span>·</span>
+                      <span>
+                        {t.createdAt
+                          ? new Date(t.createdAt).toLocaleDateString("fa-IR")
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-shrink-0 flex-wrap gap-2">
+                    <Badge variant="outline" className="rounded-full">
+                      {statusLabel[t.statusId] || t.status?.name || t.statusId}
+                    </Badge>
+                    <Badge
+                      className={`rounded-full ${
+                        t.priorityId === "urgent" || t.priorityId === "high"
+                          ? "bg-destructive/15 text-destructive"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                      variant="secondary"
+                    >
+                      {priorityLabel[t.priorityId] || t.priorityId}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
-
-        {totalCount > pageSize && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(totalCount / pageSize)}
-            onPageChange={setCurrentPage}
-          />
-        )}
       </div>
     </MainLayout>
   );

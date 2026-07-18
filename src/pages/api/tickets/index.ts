@@ -1,166 +1,122 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import ticketService from '@/services/ticketService';
+import type { NextApiRequest, NextApiResponse } from "next";
 import { format } from "date-fns-jalali";
-import fs from "fs";
-import path from "path";
+import { ticketRepo } from "@/server/ticket-repo";
+import { requireSession } from "@/server/session";
+import { notificationsRepo } from "@/server/notifications-repo";
 
-// Branch code mapping for Tehran and other cities
 const BRANCH_CODE_MAP: Record<string, string> = {
-  // تهران
-  "211": "21", // مرکز
-  "212": "21", // جنوب
-  "214": "21", // شرق
-  "215": "21", // غرب
-  "216": "21", // حومه
-  // خراسان رضوی
-  "301": "51", // مشهد
-  // اصفهان
-  "302": "31", // اصفهان
-  // فارس
-  "303": "71", // شیراز
-  // آذربایجان شرقی
-  "304": "41", // تبریز
-  // خوزستان
-  "305": "61", // اهواز
-  // البرز
-  "306": "26", // کرج
-  // قم
-  "307": "25", // قم
-  // گیلان
-  "308": "13", // رشت
-  // یزد
-  "309": "35", // یزد
-  // کرمان
-  "310": "34", // کرمان
-  // آذربایجان غربی
-  "311": "44", // ارومیه
-  // سیستان و بلوچستان
-  "312": "54", // زاهدان
-  // کردستان
-  "313": "87", // سنندج
-  // هرمزگان
-  "314": "76", // بندرعباس
-  // همدان
-  "315": "81", // همدان
-  // مازندران
-  "316": "11", // ساری
-  // گلستان
-  "317": "17", // گرگان
-  // زنجان
-  "318": "24", // زنجان
-  // لرستان
-  "319": "66", // خرم‌آباد
-  // خراسان جنوبی
-  "320": "56", // بیرجند
-  // مرکزی
-  "321": "86", // اراک
-  // قزوین
-  "322": "28", // قزوین
-  // چهارمحال و بختیاری
-  "323": "38", // شهرکرد
-  // اردبیل
-  "324": "45", // اردبیل
-  // بوشهر
-  "325": "77", // بوشهر
-  // ایلام
-  "326": "84", // ایلام
-  // کهگیلویه و بویراحمد
-  "327": "74", // یاسوج
-  // خراسان شمالی
-  "328": "58", // بجنورد
-  // سمنان
-  "329": "23", // سمنان
-  // شهرهای پرجمعیت دیگر (نمونه)
-  "340": "61", // آبادان (خوزستان)
-  "341": "31", // کاشان (اصفهان)
-  "342": "41", // مراغه (آذربایجان شرقی)
-  "343": "11", // بابل (مازندران)
-  "344": "51", // سبزوار (خراسان رضوی)
-  "345": "31", // نجف‌آباد (اصفهان)
-  "346": "81", // ملایر (همدان)
-  "347": "13", // بندر انزلی (گیلان)
-  "348": "31", // خمینی‌شهر (اصفهان)
-  "349": "21", // ورامین (تهران)
-  "350": "44", // مهاباد (آذربایجان غربی)
-  // ... شهرهای دیگر به همین صورت قابل افزودن است ...
+  "211": "21",
+  "212": "21",
+  "214": "21",
+  "215": "21",
+  "216": "21",
+  "301": "51",
+  "302": "31",
+  "303": "71",
 };
 
-async function generateTicketNumber(branchId: string) {
-  // 1. Map branchId to code
-  const branchCode = BRANCH_CODE_MAP[branchId] || branchId || "000";
-  // 2. Get Jalali date (yyyyMMdd)
-  const now = new Date();
-  const shamsiDate = format(now, "yyyyMMdd");
-  // 3. Get all tickets for this branch (could be optimized in real DB)
-  const { tickets } = await ticketService.getTickets({ branchId });
-  // 4. Filter tickets for today (Jalali date)
-  const todayTickets = tickets.filter(t => {
-    if (!t.createdAt) return false;
-    try {
-      const ticketDate = format(new Date(t.createdAt), "yyyyMMdd");
-      return ticketDate === shamsiDate;
-    } catch {
-      return false;
-    }
-  });
-  // 5. Find max ticket number for today/branch
+function generateTicketNumber(branchId?: string | null) {
+  const branchCode = BRANCH_CODE_MAP[branchId || ""] || branchId || "21";
+  const shamsiDate = format(new Date(), "yyyyMMdd");
+  const { tickets } = ticketRepo.list({ branchId: branchId || undefined, pageSize: 500 });
+  const todayPrefix = `${branchCode}${shamsiDate}`;
   let maxNo = 0;
-  todayTickets.forEach(t => {
-    const num = t.ticketNumber?.toString().slice(-2);
-    if (num && !isNaN(Number(num))) {
-      maxNo = Math.max(maxNo, Number(num));
-    }
-  });
-  const nextNo = (maxNo + 1).toString().padStart(2, "0");
-  // 6. Build code
-  return `${branchCode}${shamsiDate}${nextNo}`;
-}
-
-async function generateUniqueTicketNumber(branchId: string) {
-  let tryCount = 0;
-  let ticketNumber;
-  let isUnique = false;
-  while (!isUnique && tryCount < 5) {
-    ticketNumber = await generateTicketNumber(branchId);
-    // بررسی یکتایی (گزینه 2)
-    const { tickets } = await ticketService.getTickets({ ticketNumber });
-    if (!tickets || tickets.length === 0) {
-      isUnique = true;
-    } else {
-      // ثبت لاگ (گزینه 4)
-      try {
-        const logPath = path.join(process.cwd(), "logs", "ticket-duplicate.log");
-        fs.appendFileSync(logPath, `[${new Date().toISOString()}] Duplicate ticketNumber: ${ticketNumber}\n`);
-      } catch {}
-      tryCount++;
+  for (const t of tickets) {
+    const num = String(t.ticketNumber);
+    if (num.startsWith(todayPrefix)) {
+      const seq = Number(num.slice(-2));
+      if (!Number.isNaN(seq)) maxNo = Math.max(maxNo, seq);
     }
   }
-  if (!isUnique) {
-    // ثبت لاگ خطا
-    try {
-      const logPath = path.join(process.cwd(), "logs", "ticket-duplicate.log");
-      fs.appendFileSync(logPath, `[${new Date().toISOString()}] ERROR: Could not generate unique ticketNumber for branch ${branchId}\n`);
-    } catch {}
-  }
-  return ticketNumber;
+  const nextNo = String(maxNo + 1).padStart(2, "0");
+  return `${todayPrefix}${nextNo}`;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = requireSession(req);
+  if ("error" in session) {
+    return res.status(session.status).json({ message: session.error });
+  }
+  const { user } = session;
+
   switch (req.method) {
-    case 'GET': {
-      // لیست همه تیکت‌ها
-      const tickets = await ticketService.getTickets();
-      return res.status(200).json(tickets);
+    case "GET": {
+      const {
+        statusId,
+        priorityId,
+        categoryId,
+        departmentId,
+        branchId,
+        creatorId,
+        assigneeId,
+        userId,
+        searchTerm,
+        page,
+        pageSize,
+        ticketNumber,
+      } = req.query;
+
+      const filters = {
+        statusId: statusId as string | undefined,
+        priorityId: priorityId as string | undefined,
+        categoryId: categoryId as string | undefined,
+        departmentId: departmentId as string | undefined,
+        branchId: branchId as string | undefined,
+        creatorId: creatorId as string | undefined,
+        assigneeId: assigneeId as string | undefined,
+        userId: userId as string | undefined,
+        searchTerm: searchTerm as string | undefined,
+        ticketNumber: ticketNumber as string | undefined,
+        page: page ? Number(page) : 1,
+        pageSize: pageSize ? Number(pageSize) : 50,
+      };
+
+      // Non-admin users only see own tickets unless filters already set
+      if (user.roleId !== "admin" && !filters.userId && !filters.departmentId) {
+        filters.userId = user.id;
+      }
+
+      const result = ticketRepo.list(filters);
+      return res.status(200).json(result);
     }
-    case 'POST': {
-      // ثبت تیکت جدید
-      const ticketData = req.body;
-      // Generate unique ticket number with check (گزینه 2 و 4)
-      ticketData.ticketNumber = await generateUniqueTicketNumber(ticketData.branchId);
-      const newTicket = await ticketService.createTicket(ticketData);
-      return res.status(201).json(newTicket);
+
+    case "POST": {
+      const body = req.body || {};
+      if (!body.title || !body.description) {
+        return res.status(400).json({ message: "عنوان و توضیحات الزامی است" });
+      }
+
+      const ticketNumber = generateTicketNumber(body.branchId);
+      const ticket = ticketRepo.create({
+        title: body.title,
+        description: body.description,
+        statusId: body.statusId || "open",
+        priorityId: body.priorityId || body.priority || "medium",
+        categoryId: body.categoryId || "general",
+        departmentId: body.departmentId || "support",
+        branchId: body.branchId ?? null,
+        creatorId: body.creatorId || user.id,
+        assigneeId: body.assigneeId ?? null,
+        ticketNumber,
+        creator: {
+          id: user.id,
+          firstName: user.firstName || "کاربر",
+          lastName: user.lastName || "",
+        },
+      });
+
+      notificationsRepo.create({
+        userId: user.id,
+        type: "ticket_created",
+        message: `تیکت «${ticket.title}» با موفقیت ثبت شد`,
+        link: `/tickets/${ticket.id}`,
+      });
+
+      return res.status(201).json(ticket);
     }
+
     default:
-      return res.status(405).json({ message: 'Method Not Allowed' });
+      res.setHeader("Allow", ["GET", "POST"]);
+      return res.status(405).json({ message: "Method Not Allowed" });
   }
 }

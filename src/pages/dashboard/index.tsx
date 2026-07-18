@@ -42,70 +42,63 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MainLayout from "@/components/layouts/MainLayout";
 
-// Remove all Supabase type usages and replace with TODO or local types
-type TicketStatusName = string; // TODO: Replace with actual type if needed
-
 export default function DashboardPage() {
-  // حذف isLoading از useAuth چون وجود ندارد و فقط loading استفاده شود
-  const { user, userProfile, loading, isAdmin, isDepartmentManager, isBranchManager, isCEO, isDeputy } = useAuth();
+  const { user, userProfile, loading, isAdmin } = useAuth();
   const profile = userProfile;
   const isLoading = loading;
   const router = useRouter();
   const [ticketStats, setTicketStats] = useState({
     total: 0,
-    open: 12,
-    inProgress: 5,
-    closed: 18
+    open: 0,
+    inProgress: 0,
+    closed: 0,
   });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("my-tickets");
   const [period, setPeriod] = useState("weekly");
+  const [recentTickets, setRecentTickets] = useState<
+    Array<{
+      id: string;
+      title: string;
+      status: string;
+      date: string;
+      department: string;
+      priority: string;
+    }>
+  >([]);
 
-  // تعریف fetchTicketStats به عنوان useCallback برای جلوگیری از بازسازی غیرضروری تابع
   const fetchTicketStats = useCallback(async () => {
-    // حذف شرط if (!user) return; از fetchTicketStats تا حتی بدون user آمار تیکت‌ها لود شود
-    // if (!user) return;
+    if (!user) return;
     setIsLoadingStats(true);
     try {
-      const getStatusId = async (statusName: TicketStatusName): Promise<string | undefined> => {
-        // TODO: Implement backend logic to fetch status ID
-        return;
-      };
-
-      const openStatusId = await getStatusId("open");
-      const inProgressStatusId = await getStatusId("in_progress");
-      const closedStatusId = await getStatusId("closed");
-
-      // TODO: Implement backend logic to fetch ticket counts
-      const totalCount = 35;
-      const openCount = 12;
-      const inProgressCount = 5;
-      const closedCount = 18;
-      
-      // ایجاد تأخیر مصنوعی برای نمایش بهتر انیمیشن‌ها
-      setTimeout(() => {
-        setTicketStats({
-          total: totalCount || 0,
-          open: openCount,
-          inProgress: inProgressCount,
-          closed: closedCount
-        });
-        setIsLoadingStats(false);
-      }, 800);
+      const ticketService = (await import("@/services/ticketService")).default;
+      const data = await ticketService.getDashboardStats();
+      setTicketStats({
+        total: data.totalTickets ?? 0,
+        open: data.openTickets ?? 0,
+        inProgress: data.inProgressTickets ?? 0,
+        closed: data.closedTickets ?? 0,
+      });
+      const recent = (data.recentTickets || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        status: t.statusId || t.status?.id || "open",
+        date: t.createdAt
+          ? new Date(t.createdAt).toLocaleDateString("fa-IR")
+          : "—",
+        department: t.department?.name || t.departmentId || "—",
+        priority: t.priorityId || t.priority?.id || "medium",
+      }));
+      setRecentTickets(recent);
     } catch (error) {
       console.error("Error fetching ticket stats:", error);
       setTicketStats({ total: 0, open: 0, inProgress: 0, closed: 0 });
+      setRecentTickets([]);
+    } finally {
       setIsLoadingStats(false);
     }
   }, [user]);
-
-  // حذف ریدایرکت خودکار به لاگین برای تست سایدبار
-  // useEffect(() => {
-  //   if (!isLoading && !user) {
-  //     router.push("/auth/login");
-  //   }
-  // }, [isLoading, user, router]);
 
   useEffect(() => {
     if (user) {
@@ -118,15 +111,6 @@ export default function DashboardPage() {
     await fetchTicketStats();
     setIsRefreshing(false);
   };
-
-  // Sample data for dashboard
-  const recentTickets = [
-    { id: 1, title: "مشکل در اتصال به سرور", status: "open", date: "1402/02/15", department: "IT", priority: "high" },
-    { id: 2, title: "درخواست نرم‌افزار حسابداری", status: "in_progress", date: "1402/02/14", department: "Finance", priority: "medium" },
-    { id: 3, title: "گزارش خطا در سیستم فروش", status: "open", date: "1402/02/13", department: "Sales", priority: "high" },
-    { id: 4, title: "تغییر در ساختار دیتابیس", status: "closed", date: "1402/02/12", department: "IT", priority: "medium" },
-    { id: 5, title: "درخواست مرخصی", status: "closed", date: "1402/02/10", department: "HR", priority: "low" },
-  ];
 
   const upcomingEvents = [
     { id: 1, title: "جلسه بررسی پروژه‌ها", date: "1402/02/18", time: "10:00" },

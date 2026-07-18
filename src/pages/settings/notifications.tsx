@@ -1,39 +1,62 @@
-import React, { useEffect, useState } from "react";
-import notificationService from "@/services/notificationService";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-import NotificationList from "@/components/notifications/NotificationList";
+import React, { useState } from "react";
+import Head from "next/head";
+import MainLayout from "@/components/layouts/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/hooks/use-toast";
 
-export default function SettingsNotificationsPage() {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function NotificationSettingsPage() {
+  const [inApp, setInApp] = useState(true);
+  const [email, setEmail] = useState(false);
+  const [ticketUpdates, setTicketUpdates] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    async function fetchNotifications() {
-      setLoading(true);
-      const { notifications } = await notificationService.getNotificationsForUser(user.id);
-      setNotifications(notifications);
-      setLoading(false);
-    }
-    fetchNotifications();
-  }, [user]);
+  const save = () => {
+    localStorage.setItem(
+      "notif-prefs",
+      JSON.stringify({ inApp, email, ticketUpdates })
+    );
+    toast({ title: "ترجیحات ذخیره شد" });
+  };
 
   return (
-    <div className="container py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>اعلان‌های من</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div>در حال بارگذاری...</div>
-          ) : (
-            <NotificationList notifications={notifications} onNotificationClick={() => {}} />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <MainLayout>
+      <Head>
+        <title>تنظیمات اعلان | تیکت‌یار</title>
+      </Head>
+      <div className="mx-auto max-w-xl space-y-6">
+        <h1 className="text-2xl font-bold">ترجیحات اعلان</h1>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>کانال‌ها</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="inApp">اعلان درون‌سامانه</Label>
+              <Switch id="inApp" checked={inApp} onCheckedChange={setInApp} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email">ایمیل</Label>
+              <Switch id="email" checked={email} onCheckedChange={setEmail} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="tickets">تغییر وضعیت تیکت</Label>
+              <Switch
+                id="tickets"
+                checked={ticketUpdates}
+                onCheckedChange={setTicketUpdates}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={save}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >
+              ذخیره
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
   );
 }
